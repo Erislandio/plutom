@@ -14,12 +14,19 @@
   "publishConfig": {
     "access": "public"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Erislandio/plutom/tree/master"
+  },
   "tags": [
     "cli",
     "vtex",
     "plutom",
     "masterdata cli"
   ],
+  "engines": {
+    "node": ">=0.8.0"
+  },
   "dependencies": {
     "axios": "^0.19.2",
     "chalk": "^4.0.0",
