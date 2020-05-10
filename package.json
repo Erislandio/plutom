@@ -39,6 +39,7 @@
     "figlet": "^1.4.0",
     "inquirer": "^7.1.0",
     "minimist": "^1.2.5",
+    "node-localstorage": "^2.1.6",
     "node-sql-parser": "^1.9.2",
     "shelljs": "^0.8.4"
   }

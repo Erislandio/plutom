@@ -4,25 +4,19 @@ const logs = require("../common/chalk");
 const accounts = require("../accounts.json");
 const fs = require("fs");
 const account = require("../account.json");
-const Client = require("../client/client");
-const api = new Client();
+const api = require("../client/client");
+const { LocalStorage } = require("node-localstorage");
+global.localStorage = new LocalStorage(path.resolve(__dirname, "../local"));
 
 const find = (account) => {
   const findAccount = accounts.find((item) => item.account == account);
   return findAccount;
 };
 
-const logOnTerminal = (message, type) => {
-  switch (type) {
-    case "error":
-      return console.log(logs.error(`\n ${message} \n`));
-    case "success":
-      return console.log(logs.success(`\n ${message} \n`));
-    case "info":
-      return console.log(logs.info(`\n ${message} \n`));
-    default:
-      return console.table(message);
-  }
+const formatedDate = (data) => {
+  const date = new Date(data);
+
+  return date.toLocaleDateString();
 };
 
 const add = () => {
@@ -33,46 +27,76 @@ const add = () => {
         name: "account",
         message: "* Account: ",
         default: path.basename(process.cwd()),
+        required: true,
+        validate: function validateFirstName(name) {
+          return name !== "";
+        },
       },
       {
         type: "text",
         name: "appKey",
         message: "* API KEY: ",
         default: path.basename(process.cwd()),
+        required: true,
+        validate: function validateFirstName(name) {
+          return name !== "";
+        },
       },
       {
         type: "text",
         name: "appToken",
         message: "* API TOKEN: ",
         default: path.basename(process.cwd()),
+        required: true,
+        validate: function validateFirstName(name) {
+          return name !== "";
+        },
       },
     ])
     .then(({ account, appKey, appToken }) => {
-      const findAccount = find(account);
-
-      if (findAccount) {
-        const list = accounts.map((item) => ({
-          name: item.account,
-          token: item.appKey,
-        }));
-
-        console.table(list);
-        return console.log(logs.warning(`Account: ${account} already exists`));
+      if (!account || !appKey || !appToken) {
+        return console.log(logs.warning("Invalid fields"));
       }
 
-      const newAccount = accounts.concat({ account, appKey, appToken });
+      const id = localStorage.getItem("userId");
 
-      fs.writeFileSync(
-        path.resolve(__dirname + "/../accounts.json"),
-        JSON.stringify(newAccount)
-      );
+      if (!id) {
+        return console.log(
+          logs.info(
+            "You need to login before doing this operation, try the command --login"
+          )
+        );
+      }
 
-      console.log(
-        logs.success(`Account: ${logs.warning(account)}, created successfully`)
-      );
+      api
+        .post("/v1/add", {
+          id,
+          account: {
+            name: account,
+            appKey,
+            appToken,
+          },
+        })
+        .then((res) => {
+          if (res.data.error) {
+            return console.log(logs.warning(res.data.message));
+          }
+
+          if (res.data) {
+            return console.log(
+              logs.success(
+                `\n Account: ${logs.info(account)} successfully created`
+              )
+            );
+          }
+        })
+        .catch((error) => {
+          console.log(logs.error(error.message));
+        });
     })
-    .catch(() => {
+    .catch((error) => {
       console.log(logs.error("error: there was an error at the time"));
+      console.log(logs.error(error.message));
     });
 };
 
@@ -121,134 +145,181 @@ const use = (param) => {
     });
 };
 
-const info = () => {
-  if (account && account.account) {
-    return console.log(
-      logs.success(
-        `You are logged in to the account: ${logs.info(account.account)}`
-      )
-    );
+const info = async () => {
+  const id = localStorage.getItem("userId");
+
+  if (id) {
+    return api
+      .get(`/v1/user?id=${id}`, {
+        id,
+      })
+      .then(({ data }) => {
+        if (data.error) {
+          return console.log("\n", logs.error(data.message));
+        }
+
+        console.log(logs.warning("email: "), logs.info(data.email));
+        console.log(
+          logs.warning("User created on: "),
+          logs.info(formatedDate(data.createdAt))
+        );
+        console.log(logs.warning("Accounts"));
+
+        if (data.accounts.length === 0) {
+          return console.log(logs.warning("No account registered"));
+        }
+
+        return console.table(
+          data.accounts.map((item) => {
+            return {
+              account: item.name,
+              appKey: item.appKey,
+            };
+          })
+        );
+      })
+      .catch((error) => {
+        console.log(error.message);
+      });
   }
 
-  return console.log(
-    logs.warning(`
-    you are not logged into any account`)
-  );
+  return console.log(logs.info(`you need to login to get the information`));
 };
 
-const logout = () => {
-  if (account && account.account) {
-    try {
-      fs.writeFileSync(
-        path.resolve(__dirname + "/../account.json"),
-        JSON.stringify({ account: null })
-      );
+const logout = async () => {
+  const id = await localStorage.getItem("userId");
 
-      return console.log(
-        logs.success(
-          `you successfully logged out!: ${logs.info(account.account)}`
-        )
-      );
+  if (id) {
+    try {
+      localStorage.setItem("userId", "");
+      localStorage.setItem("token", "");
+
+      return console.log(logs.success(`you successfully logged out!`));
     } catch (error) {
       return console.log(
-        logs.error("An error occurred while trying to log out, try again")
+        logs.error("An error occurred while trying to log out, try again"),
+        logs.error(`\n ${error.message}`)
       );
     }
-  } else {
-    return console.log(
-      logs.warning(
-        `you need to select an account first, hold the command --add or --use`
-      )
-    );
   }
+  return console.log(
+    logs.warning(
+      `you need to select an account first, hold the command --add or --use`
+    )
+  );
 };
 
 const list = (param) => {
-  if (typeof param === "string") {
-    const accountList = accounts.filter((item) => {
-      return item.account === param;
-    });
+  const id = localStorage.getItem("userId");
 
-    if (accountList.length) {
-      return console.table(
-        accountList.map(({ account, appKey }) => ({ account, appKey }))
-      );
-    }
-
-    return console.log(logs.warning(`Account: ${logs.info(param)} not found`));
-  }
-
-  if (accounts.length === 0) {
-    console.log(
-      logs.info(`
-    There are no accounts registered at the moment, use the ${logs.success(
-      "--add command"
-    )} to add a new account in the app.`)
-    );
-
-    return inquirer
-      .prompt([
-        {
-          type: "confirm",
-          message: "Do you want to add a new account?",
-          name: "add",
-        },
-      ])
-      .then(() => {
-        return add();
-      })
-      .catch(() => console.log(logs.error("Exit")));
-  }
-
-  return console.table(
-    accounts.map(({ account, appKey, appToken }) => ({
-      account,
-      appKey,
-      appToken,
-    }))
-  );
-};
-
-const remove = (param) => {
-  const findAccount = accounts.find((item) => {
-    return item.account === param;
-  });
-
-  const newAccounts = accounts.filter((item) => {
-    return item.account !== param;
-  });
-
-  if (!findAccount) {
+  if (!id) {
     return console.log(
-      logs.error(
-        `Account: ${logs.warning(
-          param
-        )}, has already been removed or cannot be found`
-      )
+      logs.warning(`You must be logged in to perform this function`)
     );
   }
 
-  inquirer
-    .prompt([
-      {
-        type: "confirm",
-        message: `Are you sure you want to remove: ${param}?`,
-        name: "remove",
-      },
-    ])
-    .then(() => {
-      fs.writeFileSync(
-        path.resolve(__dirname + "/../accounts.json"),
-        JSON.stringify(newAccounts)
-      );
+  api
+    .get(`/v1/user/account?id=${id}`, {
+      id,
+    })
+    .then(({ data }) => {
+      if (data.error) {
+        return console.log(data.message);
+      }
 
-      return console.log(
-        logs.success(`Account: ${logs.warning(param)} was remove successfully`)
+      if (data.length === 0) {
+        return console.log(logs.warning("No account found"));
+      }
+
+      return console.table(
+        data.map((item) => {
+          return {
+            account: item.name,
+            appKey: item.appKey,
+          };
+        })
       );
     })
-    .catch(() => {
-      return console.log(
-        logs.error(`Account: ${logs.warning(param)} was remove successfully`)
+    .catch((error) => {
+      console.log(logs.error(error.message));
+    });
+};
+
+const remove = async () => {
+  const id = localStorage.getItem("userId");
+
+  if (!id) {
+    return console.log(
+      logs.warning(`You must be logged in to perform this function`)
+    );
+  }
+
+  const { data } = await api.get(`/v1/user/account?id=${id}`);
+
+  if (data.length === 0) {
+    console.log(logs.warning("No account registered"));
+  }
+
+  const accounts = data.map((item) => ({
+    name: item.name,
+  }));
+
+  return inquirer
+    .prompt([
+      {
+        type: "list",
+        choices: accounts,
+        message: "Select a account",
+        default: path.basename(process.cwd()),
+        name: "selected",
+      },
+    ])
+    .then(({ selected }) => {
+      return inquirer
+        .prompt([
+          {
+            type: "confirm",
+            message: `Are you sure you want to remove the account: ${selected}?`,
+            name: `account`,
+          },
+        ])
+        .then(({ account }) => {
+          if (account) {
+            api
+              .delete("/v1/user/account", {
+                id,
+                name: account,
+              })
+              .then(({ data }) => {
+                if (data.error) {
+                  return console.log(data.message);
+                }
+
+                return console.log(
+                  logs.info(
+                    `Account: ${logs.success(
+                      account
+                    )} has been successfully removed!`
+                  )
+                );
+              })
+              .catch((error) => {
+                console.log(error.message);
+                console.log(
+                  logs.error(
+                    "Unable to create a new user at this time, please try again"
+                  )
+                );
+              });
+          } else {
+            return;
+          }
+        });
+    })
+    .catch((error) => {
+      console.log(error.message);
+      console.log(
+        logs.error("Unable to create a new user at this time, please try again")
       );
     });
 };
@@ -359,6 +430,94 @@ const desc = async (query) => {
   });
 };
 
+const newUser = async () => {
+  return inquirer
+    .prompt([
+      {
+        type: "text",
+        name: "email",
+        message: "* Email: ",
+        default: path.basename(process.cwd()),
+      },
+      {
+        type: "text",
+        name: "password",
+        message: "* password: ",
+        default: path.basename(process.cwd()),
+      },
+    ])
+    .then(async ({ password, email }) => {
+      if (!password || !email) {
+        return console.log(logs.error(`Invalide fields`));
+      }
+
+      const { data } = await api.post("/v1/user", {
+        email: email.trim(),
+        password: password.trim(),
+      });
+
+      if (data.error) {
+        return console.log(logs.error(data.message));
+      }
+
+      console.log(
+        logs.success(
+          `\n User create successfully, email: ${logs.info(email)} \n`
+        )
+      );
+
+      return loginMethod(email, password);
+    })
+    .catch((error) => {
+      console.log(error.message);
+      console.log(
+        logs.error("Unable to create a new user at this time, please try again")
+      );
+    });
+};
+
+const loginMethod = async (email, password) => {
+  const { data } = await api.post("/v1/login", {
+    email: email.trim(),
+    password: password.trim(),
+  });
+
+  if (data.error) {
+    return console.log(logs.error(data.error));
+  }
+
+  global.localStorage.setItem("token", data.token);
+  global.localStorage.setItem("userId", data.user._id);
+
+  return console.log(
+    logs.success(`Login successfully, email: ${logs.info(email)}`)
+  );
+};
+
+const login = async () => {
+  return inquirer
+    .prompt([
+      {
+        type: "text",
+        name: "email",
+        message: "* Email: ",
+        default: path.basename(process.cwd()),
+      },
+      {
+        type: "password",
+        name: "password",
+        message: "* password: ",
+        default: path.basename(process.cwd()),
+      },
+    ])
+    .then(async ({ password, email }) => {
+      return loginMethod(email, password);
+    })
+    .catch(() => {
+      console.log(logs.error("Unable to login at this time, please try again"));
+    });
+};
+
 module.exports = {
   add,
   use,
@@ -366,8 +525,10 @@ module.exports = {
   logout,
   list,
   remove,
+  login,
   databases,
   findAll,
   filter,
   desc,
+  newUser,
 };
