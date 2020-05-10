@@ -29,17 +29,18 @@ function buildProgram() {
     .option("-u, --use", "Use an account")
     .option("-i, --info", "Show account info")
     .option("-a, --add", "Add an account")
-    .option("-l, --logout", "Logout from account")
-    .option("-ls, --list [account]", "Lists created accounts")
+    .option("--logout", "Logout")
+    .option("-ls, --list", "Lists created accounts")
     .option("-rm, --remove ", "Remove an account")
     .option("-dbs, --databases", "List databases (acronym)")
     .option("--all <acronym>", "Get all data from acronym")
     .option(
       "-q, --query <query>",
-      "Get all data from acronym - ex: firstName from CL"
+      "Get all data from acronym - ex: select firstName from CL"
     )
-    .option("-d, --desc <acronym>", "List info from table ex: desc  CL")
-    .option("-n, --new ", "Create new user");
+    .option("-d, --desc <acronym>", "List info from table ex: --desc  'CL'")
+    .option("-n, --new ", "Create new user")
+    .option("--banner", "Show banner");
 
   program.parse(process.argv);
 }
@@ -98,6 +99,9 @@ function runCommand() {
     console.log(logs.success(`\n *  Welcome - Create new Account * \n`));
     newUser();
   }
+  if (program.banner) {
+    return banner();
+  }
 }
 
 function banner() {
@@ -107,6 +111,7 @@ function banner() {
       console.dir(err);
       return;
     }
+    console.log(logs.success('Developed by: Erislandio Soares ;-)'))
     return console.log(data);
   });
 }

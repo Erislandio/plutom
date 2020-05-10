@@ -72,9 +72,9 @@ const add = () => {
         .post("/v1/add", {
           id,
           account: {
-            name: account,
-            appKey,
-            appToken,
+            name: account.replace(/ /g, ""),
+            appKey: appKey.replace(/ /g, ""),
+            appToken: appToken.replace(/ /g, ""),
           },
         })
         .then((res) => {
@@ -177,7 +177,7 @@ const info = async () => {
           logs.info(formatedDate(data.createdAt))
         );
 
-        if (data.account) {
+        if (data.account && data.account.name) {
           console.log(
             logs.warning(
               `You are using the account: ${logs.info(data.account.name)}`
@@ -187,18 +187,18 @@ const info = async () => {
 
         if (data.accounts.length === 0) {
           return console.log(logs.warning("No account registered"));
+        } else {
+          console.log(logs.warning("Accounts"));
+
+          return console.table(
+            data.accounts.map((item) => {
+              return {
+                account: item.name,
+                appKey: item.appKey,
+              };
+            })
+          );
         }
-
-        console.log(logs.warning("Accounts"));
-
-        return console.table(
-          data.accounts.map((item) => {
-            return {
-              account: item.name,
-              appKey: item.appKey,
-            };
-          })
-        );
       })
       .catch((error) => {
         console.log(error.message);
@@ -336,7 +336,7 @@ const remove = async () => {
                     "Unable to create a new user at this time, please try again"
                   )
                 );
-              });   
+              });
 
             api.get(`/v1/user?id=${id}`).then(({ data }) => {
               if (data.account) {
@@ -375,8 +375,8 @@ const remove = async () => {
     });
 };
 
-const isValid = () => {
-  if (!account.account) {
+const isValid = (id) => {
+  if (!id) {
     console.log(
       logs.warning(
         `\n You need to be logged into an account, use the: ${logs.info(
@@ -388,22 +388,26 @@ const isValid = () => {
     return false;
   }
 
-  if (!account.appKey || !account.appToken) {
-    console.log(logs.warning(`\n You need to configure appKey and appToken`));
-
-    return false;
-  }
-
   return true;
 };
 
 const databases = async () => {
-  if (!isValid()) return;
+  const id = localStorage.getItem("userId");
+
+  if (!isValid(id)) return;
   try {
-    return api.databases().then((res) => {
-      console.log(logs.info(`\n \n ** Available databases ** \n`));
-      return res;
-    });
+    return api
+      .post("/v1/search/databases", {
+        id,
+      })
+      .then(({ data }) => {
+        if (data.error) {
+          console.log("\n");
+          return console.log(logs.warning(data.message));
+        }
+        console.log("\n");
+        console.table(data);
+      });
   } catch (error) {
     console.log(error);
   }
@@ -458,27 +462,47 @@ const filter = async (query) => {
 };
 
 const desc = async (query) => {
-  if (query.length !== 2) {
-    return console.log(logs.warning("Invalid acronym"));
+  const id = localStorage.getItem("userId");
+
+  if (!id) {
+    return console.log(
+      logs.warning(
+        `\n You need to be logged into an account, use the: ${logs.info(
+          "--login command"
+        )}`
+      )
+    );
   }
 
-  return api.desc(query.toUpperCase()).then((res) => {
-    if (res.status === 200) {
-      console.log("\n");
-      return console.table(
-        res.data.fields.map(
-          ({ name, type, isNullable, isSearchable, isFilter }) => ({
-            name,
-            type,
-            isNullable,
-            isSearchable,
-            isFilter,
-          })
-        )
-      );
-    }
-    return null;
-  });
+  if (query.length !== 2) {
+    return console.log(logs.warning("\n Invalid acronym \n "));
+  }
+
+  return api
+    .post(`/v1/desc`, {
+      acronym: query,
+      id,
+    })
+    .then(({ data }) => {
+      if (data.error) {
+        return console.log(logs.error(data.message));
+      }
+
+      if (data.length) {
+        console.log("\n");
+        console.table(
+          data.map((item) => ({
+            name: item.name,
+            type: item.type,
+            isSearchable: item.isSearchable,
+            isFilter: item.isFilter,
+          }))
+        );
+      }
+    })
+    .catch(() => {
+      console.log(logs.error("Unable to desc table, please try again"));
+    });
 };
 
 const newUser = async () => {
@@ -529,8 +553,8 @@ const newUser = async () => {
 
 const loginMethod = async (email, password) => {
   const { data } = await api.post("/v1/login", {
-    email: email.trim(),
-    password: password.trim(),
+    email: email.trim().replace(/ /g, ""),
+    password: password.trim().replace(/ /g, ""),
   });
 
   if (data.error) {
