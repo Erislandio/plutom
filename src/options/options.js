@@ -428,6 +428,10 @@ const formateWhere = (where) => {
 };
 
 const filter = async (query) => {
+  const id = localStorage.getItem("userId");
+
+  if (!isValid(id)) return;
+
   const {
     type,
     columns,
@@ -438,12 +442,19 @@ const filter = async (query) => {
   const find = formateWhere(where);
 
   if (columns === "*" && where !== null) {
-    return api.findAll(table.toUpperCase(), "_all", find).then((res) => {
-      if (res.status === 200) {
-        return console.log(res.data);
-      }
-      return null;
-    });
+    return api
+      .post(`/v1/search`, {
+        id,
+        acronym: table,
+        fields: "_all",
+        where: find,
+      })
+      .then((res) => {
+        if (res.status === 200) {
+          return console.log(res.data);
+        }
+        return null;
+      });
   }
 
   const formateColumns = columns
@@ -452,13 +463,20 @@ const filter = async (query) => {
     })
     .join(",");
 
-  return api.findAll(table, formateColumns, find).then((res) => {
-    if (res.status === 200) {
-      console.log("\n");
-      return console.table(res.data);
-    }
-    return null;
-  });
+  return api
+    .post("/v1/search", {
+      id,
+      acronym: table,
+      fields: formateColumns,
+      where: find,
+    })
+    .then((res) => {
+      if (res.status === 200) {
+        console.log("\n");
+        return console.table(res.data);
+      }
+      return null;
+    });
 };
 
 const desc = async (query) => {
