@@ -257,7 +257,7 @@ const remove = async () => {
   const { data } = await api.get(`/v1/user/account?id=${id}`);
 
   if (data.length === 0) {
-    console.log(logs.warning("No account registered"));
+    return console.log(logs.warning("No account registered"));
   }
 
   const accounts = data.map((item) => ({
@@ -285,10 +285,14 @@ const remove = async () => {
         ])
         .then(({ account }) => {
           if (account) {
+            const accountId = data.find((item) => item.name === selected);
+
             api
               .delete("/v1/user/account", {
-                id,
-                name: account,
+                data: {
+                  id,
+                  accountId,
+                },
               })
               .then(({ data }) => {
                 if (data.error) {
@@ -298,7 +302,7 @@ const remove = async () => {
                 return console.log(
                   logs.info(
                     `Account: ${logs.success(
-                      account
+                      selected
                     )} has been successfully removed!`
                   )
                 );
