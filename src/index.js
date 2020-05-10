@@ -26,7 +26,7 @@ const {
 function buildProgram() {
   program
     .option("-lg, --login ", "Login on application")
-    .option("-u, --use <account>", "Use an account")
+    .option("-u, --use", "Use an account")
     .option("-i, --info", "Show account info")
     .option("-a, --add", "Add an account")
     .option("-l, --logout", "Logout from account")

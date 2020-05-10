@@ -100,47 +100,60 @@ const add = () => {
     });
 };
 
-const use = (param) => {
-  if (!accounts.length) {
+const use = async (param) => {
+  const id = localStorage.getItem("userId");
+
+  if (!id) {
     return console.log(
-      logs.error(
-        `You need to register an account first, use the --add parameter`
-      )
+      logs.warning(`You must be logged in to perform this function`)
     );
   }
 
-  if (typeof param !== "boolean") {
-    const accountSelector = find(param);
+  const { data } = await api.get(`/v1/user/account?id=${id}`);
 
-    if (accountSelector) {
-      fs.writeFileSync(
-        path.resolve(__dirname + "/../account.json"),
-        JSON.stringify(accountSelector)
-      );
-
-      return console.log(logs.success(`You logged into the account: ${param}`));
-    }
-
-    return console.log(logs.error(`Account: ${param} does not exist`));
+  if (data.length === 0) {
+    return console.log(logs.warning("No account registered"));
   }
+
+  const accounts = data.map((item) => ({
+    name: item.name,
+  }));
 
   return inquirer
     .prompt([
       {
         type: "list",
-        choices: accounts.map(({ account }) => account),
-        message: "Select account:",
-        name: "account",
+        choices: accounts,
+        message: "Select a account to use",
+        default: path.basename(process.cwd()),
+        name: "selected",
       },
     ])
-    .then(({ account }) => {
-      const accountSelector = find(account);
-      fs.writeFileSync(
-        path.resolve(__dirname + "/../account.json"),
-        JSON.stringify(accountSelector)
-      );
-      return console.log(
-        logs.success(`You logged into the account: ${account}`)
+    .then(({ selected }) => {
+      api
+        .post("/v1/set/account", {
+          name: selected,
+          id,
+        })
+        .then(({ data }) => {
+          if (data.error) {
+            return console.log(logs.error(data.message));
+          }
+
+          return console.log(
+            logs.success(`You are using the account: ${selected}`)
+          );
+        })
+        .catch(() => {
+          console.log(
+            logs.error("Unable to use a account at this time, please try again")
+          );
+        });
+    })
+    .catch((error) => {
+      console.log(error.message);
+      console.log(
+        logs.error("Unable to use a account at this time, please try again")
       );
     });
 };
@@ -163,11 +176,20 @@ const info = async () => {
           logs.warning("User created on: "),
           logs.info(formatedDate(data.createdAt))
         );
-        console.log(logs.warning("Accounts"));
+
+        if (data.account) {
+          console.log(
+            logs.warning(
+              `You are using the account: ${logs.info(data.account.name)}`
+            )
+          );
+        }
 
         if (data.accounts.length === 0) {
           return console.log(logs.warning("No account registered"));
         }
+
+        console.log(logs.warning("Accounts"));
 
         return console.table(
           data.accounts.map((item) => {
@@ -283,7 +305,7 @@ const remove = async () => {
             name: `account`,
           },
         ])
-        .then(({ account }) => {
+        .then(async ({ account }) => {
           if (account) {
             const accountId = data.find((item) => item.name === selected);
 
@@ -314,7 +336,32 @@ const remove = async () => {
                     "Unable to create a new user at this time, please try again"
                   )
                 );
-              });
+              });   
+
+            api.get(`/v1/user?id=${id}`).then(({ data }) => {
+              if (data.account) {
+                if (data.account.name === selected) {
+                  api
+                    .post(`/v1/exit/account`, {
+                      id,
+                    })
+                    .then(() => {
+                      console.log(
+                        logs.info(
+                          `You have been successfully logged out of the account: ${selected}`
+                        )
+                      );
+                    })
+                    .catch(() => {
+                      console.log(
+                        logs.error(
+                          `An error occurred while trying to log out of the account: ${selected}`
+                        )
+                      );
+                    });
+                }
+              }
+            });
           } else {
             return;
           }
