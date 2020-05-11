@@ -250,7 +250,7 @@ const list = (param) => {
       }
 
       if (data.length === 0) {
-        return console.log(logs.warning("No account found"));
+        return console.log(logs.warning("\n No accounts registered, try the --add command"));
       }
 
       return console.table(
