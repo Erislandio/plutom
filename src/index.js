@@ -80,11 +80,16 @@ function runCommand() {
   }
 
   if (program.query) {
-    spinner.start();
+    try {
+      spinner.start();
 
-    filter(parser.astify(program.query)).finally(() => {
+      filter(parser.astify(program.query)).finally(() => {
+        spinner.stop();
+      });
+    } catch (error) {
       spinner.stop();
-    });
+      console.log(logs.error('\n Invalid query'))
+    }
   }
 
   if (program.desc) {
