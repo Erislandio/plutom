@@ -4,10 +4,8 @@
 
 ## Install
 
-```
-
+```SH
 yarn global add @erislandio/plutom or npm install @erislandio/plutom -g
-
 ```
 
   
@@ -87,3 +85,33 @@ plutom --add
   
 
 ### Query example:
+
+* all databases
+
+```SH
+    plutom --dbs
+```
+
+* select
+
+```sh
+    plutom -q "select * from CL where email='user@email.com'"
+```
+
+* select filter
+
+```sh
+    plutom -q "select firstName, lastName from CL where email='user@email.com'"
+```
+
+* desc
+
+```sh
+    plutom --desc CL
+```
+
+### Exit
+
+```sh
+    plutom --logout
+```
