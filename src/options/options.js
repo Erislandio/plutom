@@ -413,7 +413,7 @@ const databases = async () => {
   }
 };
 
-const findAll = async (acronym) => {};
+const findAll = async (acronym) => { };
 
 const formateWhere = (where) => {
   const {
@@ -533,9 +533,9 @@ const newUser = async () => {
         default: path.basename(process.cwd()),
       },
       {
-        type: "text",
+        type: "password",
         name: "password",
-        message: "* password: ",
+        message: "* Password: ",
         default: path.basename(process.cwd()),
       },
     ])
